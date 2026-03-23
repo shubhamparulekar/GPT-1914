@@ -1,0 +1,107 @@
+Experiment 2: Does the Metadata Frame Actually Help?
+Full Outline
+Research Question
+Does the historical metadata frame (author, date, nationality, genre, profession) provide genuine signal to models, or is it decorative? And does it matter what kind of question it is?
+
+Hypothesis
+
+Full metadata > no metadata > shuffled metadata in performance (real frames help; wrong frames actively mislead)
+The harm from shuffled metadata will be largest for book_context questions (character, topic sentence) because those questions are about a specific book — wrong metadata is contradictory, not just absent
+world_context questions (knowledge, inference) will show smaller gaps — the metadata is contextualizing but not load-bearing
+Three Conditions
+
+Condition	Description	File
+A — Full	Existing benchmark, unchanged	all_benchmark_questions.jsonl
+B — No metadata	metadata_frame replaced with a neutral placeholder	benchmark_no_metadata.jsonl
+C — Shuffled	metadata_frame randomly reassigned within each frame_type group	benchmark_shuffled_metadata.jsonl
+Shuffling within frame_type ensures a cloze question always gets a cloze-style frame (passage context), not a knowledge-style frame — isolating metadata content from metadata format.
+
+What to Measure
+
+Brier score (primary — more sensitive)
+MCQ accuracy + skill score
+Both broken down by:
+frame_type (world_context / book_context / passage_context)
+reasoning_type (knowledge, inference, character_modeling, constrained_generation, topic_sentence, phrase_cloze, sentence_cloze)
+
+Model(s) to Run
+
+Qwen2.5-7B-Instruct (already have baseline results for condition A — can re-run for B and C, or use existing results for A)
+any other oen source and free model like gpt oss
+
+Steps
+
+Write create_metadata_conditions.py — produces files B and C from A
+Run benchmark_evaluation.py on files B and C (condition A already done)
+Collect all three result files and write an analysis script
+Produce comparison tables and plots
+Detailed LLM Resume Instructions
+
+
+Context: I am working on the ChronoLogic benchmark project at \GPT-1914\chronologic. This is a benchmark for historically-situated reasoning in LLMs, covering English texts from 1875–1924.
+
+I am running Experiment 2: Metadata Ablation. The goal is to test whether the metadata_frame field in benchmark questions provides genuine signal to models. We are creating three versions of the benchmark and evaluating a model on all three.
+
+Step 1 — Write the condition-creation script
+
+Write a script at \GPT-1914\chronologic\evalcode\create_metadata_conditions.py.
+
+It should:
+
+Read \GPT-1914\chronologic\booksample\all_benchmark_questions.jsonl
+Produce two output files in c:\Users\shubh\GPT-1914\chronologic\evalcode\:
+Output 1: benchmark_no_metadata.jsonl
+Replace the metadata_frame field of every question with this exact neutral string:
+"The following is a question about a text."
+All other fields unchanged.
+
+Output 2: benchmark_shuffled_metadata.jsonl
+Shuffle metadata_frame values randomly within each frame_type group (i.e., questions sharing the same frame_type value get their metadata_frame values permuted among themselves). Use random.seed(42) for reproducibility. A question must not receive its own original metadata_frame — if the shuffle produces any fixed points, re-shuffle that group. All other fields unchanged.
+
+Print a summary after writing: total questions, and per-frame_type counts to verify the shuffle worked correctly.
+
+Step 2 — Verify the files
+
+After writing the script, read the first 2 entries of each output file and confirm:
+
+benchmark_no_metadata.jsonl: metadata_frame is the neutral string, all other fields intact
+benchmark_shuffled_metadata.jsonl: metadata_frame is different from the original, all other fields intact
+Step 3 — Run the evaluation
+
+The evaluation script is at \GPT-1914\chronologic\evalcode\benchmark_evaluation.py.
+
+Before writing any eval commands, read benchmark_evaluation.py and benchmark_evaluation_usage.md to understand the exact CLI interface. Then run Qwen2.5-7B-Instruct (or whatever model is available) on both new condition files using the same settings used for the original benchmark run. Check the existing eval result files (named eval_report_*.md in chronologic/booksample/) to see what model and settings were used previously, and match them.
+
+Save results to:
+
+evalcode/results_no_metadata.json (or whatever format the eval script outputs)
+evalcode/results_shuffled_metadata.json
+The condition A (full metadata) results already exist — find them in the repo before running anything new.
+
+Step 4 — Write the analysis script
+
+Write \GPT-1914\chronologic\evalcode\analyze_metadata_experiment.py.
+
+It should:
+
+Load all three result files (conditions A, B, C)
+Compute for each condition:
+Overall mean Brier score
+Overall MCQ accuracy and skill score
+Mean Brier score broken down by frame_type
+Mean Brier score broken down by reasoning_type
+Print a formatted comparison table for each breakdown
+Write results to evalcode\experiment2_results.csv
+Key file locations to know:
+
+Benchmark source: chronologic/booksample/all_benchmark_questions.jsonl (709 questions)
+Eval script: chronologic/evalcode/benchmark_evaluation.py
+Eval usage docs: chronologic/evalcode/benchmark_evaluation_usage.md
+Existing eval reports: chronologic/booksample/eval_report_*.md
+Question fields relevant here: metadata_frame, frame_type, reasoning_type, question_category
+frame_type values: world_context, book_context, passage_context
+
+reasoning_type values: knowledge, refusal, inference, character_modeling, constrained_generation, topic_sentence, phrase_cloze, sentence_cloze
+
+Start with Step 1. Read the source file first before writing anything.
+
