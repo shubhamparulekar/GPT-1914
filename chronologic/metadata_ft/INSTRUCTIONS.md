@@ -30,7 +30,7 @@ python -c "import torch; print(torch.cuda.get_device_name(0))"
 ```bash
 cd <wherever-you-cloned-the-repo>
 git pull
-```
+
 
 Verify the new directory is there:
 ```bash
@@ -315,3 +315,38 @@ python -c "import bitsandbytes; print('OK')"
 **Generation looks wrong / no adapter effect:**
 Make sure you're passing `--lora-adapter` to the same model ID used for training.
 The adapter is model-specific: a Qwen adapter won't work on Mistral.
+
+---
+
+## Using Claude Code instead of running commands manually
+
+If Claude Code is installed on the H100 machine, open a terminal in the
+`chronologic/metadata_ft/` directory and start it:
+
+```bash
+claude
+```
+
+Then paste this prompt and Claude Code will handle the rest:
+
+```
+Read INSTRUCTIONS.md in this directory, then execute every step in order:
+environment setup, data preparation, fine-tuning, and both evaluation runs.
+After all three evaluation JSON files are written, commit them and push to git.
+Ask me before running the fine-tuning step (step 4) so I can confirm the
+model path and VRAM look correct first.
+```
+
+That is all you need to say. Claude Code will:
+- Read the file
+- Run each shell command
+- Ask for confirmation before the long training step
+- Handle errors if they come up (wrong CUDA version, missing packages, etc.)
+- Commit and push the results at the end
+
+**If Claude Code is not installed:**
+```bash
+pip install claude-code       # or: npm install -g @anthropic-ai/claude-code
+claude --version
+```
+You will need an Anthropic API key set as `ANTHROPIC_API_KEY` in your environment.
