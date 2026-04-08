@@ -66,7 +66,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 SCRIPT_DIR = Path(__file__).parent
-DEFAULT_SOURCE = SCRIPT_DIR.parent / "booksample" / "chronologic_en_0.1.jsonl"
+DEFAULT_SOURCE = SCRIPT_DIR.parent / "booksample" / "chronologic_en_0.2.jsonl"
 DATA_DIR = SCRIPT_DIR / "data"
 
 
