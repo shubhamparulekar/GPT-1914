@@ -38,6 +38,7 @@ Examples:
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -114,6 +115,27 @@ def parse_args(argv=None):
 
 
 # ---------------------------------------------------------------------------
+# Answer cleaning (strip OCR artifacts from generated text before scoring)
+# ---------------------------------------------------------------------------
+
+def clean_answer(text: str) -> str:
+    """Strip HathiTrust OCR artifacts that the model may reproduce in generation.
+
+    Removes standalone page numbers, ALL-CAPS running headers, and numeric
+    repetition runs — the same patterns cleaned from training passages in
+    prepare_data.py.  Leaves prose content untouched.
+    """
+    text = re.sub(r'\n[ \t]*\d{1,4}[ \t]*\n', '\n', text)
+    text = re.sub(r'\n[ \t]*[A-Z][A-Z\s\-:\'\.]{3,40}[ \t]+\d{1,4}[ \t]*\n', '\n', text)
+    text = re.sub(r'\n[ \t]*[A-Z][A-Z\s\-:\'\.]{3,60}[ \t]*\n', '\n', text)
+    text = re.sub(r'\n[A-Z][A-Z\s_]{2,30}\.\s*\d{1,4}\s+', '\n', text)
+    text = re.sub(r'\n[A-Z]{3,20}\.\s+(?=[a-z"\'«])', '\n', text)
+    text = re.sub(r'(\b\d{1,4}[\.\,\s]+){3,}', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+# ---------------------------------------------------------------------------
 # Step 1: Load rejected questions
 # ---------------------------------------------------------------------------
 
@@ -163,7 +185,7 @@ def triage_with_rejected(answers, benchmark, rejected_qnums):
     for qnum_raw, entry in answers.items():
         qnum = str(qnum_raw)
         ground_truth = entry.get("ground_truth", "")
-        model_answer = entry.get("answer", "")
+        model_answer = clean_answer(entry.get("answer", ""))
         reasoning_type = entry.get("reasoning_type", "")
 
         bench = benchmark.get(qnum, {})
