@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from prepare_data import (
     build_instruction,
+    clean_passage,
     collect_examples,
     make_example,
     split_by_book,
@@ -55,6 +56,81 @@ def make_q(**overrides):
 
 def long_passage(n: int = 150) -> str:
     return "Historical prose. " * (n // 17 + 1)  # ~150+ chars
+
+
+# ---------------------------------------------------------------------------
+# clean_passage
+# ---------------------------------------------------------------------------
+
+class TestCleanPassage:
+
+    def test_removes_standalone_page_number(self):
+        text = "Some prose here.\n123\nMore prose after."
+        assert "123" not in clean_passage(text)
+        assert "Some prose here." in clean_passage(text)
+        assert "More prose after." in clean_passage(text)
+
+    def test_removes_header_with_page_number(self):
+        # e.g. "THE CELLAR-HOUSE 123"
+        text = "Good prose.\nTHE CELLAR-HOUSE 123\nMore good prose."
+        result = clean_passage(text)
+        assert "123" not in result
+        assert "Good prose." in result
+
+    def test_removes_allcaps_running_header(self):
+        text = "End of paragraph.\nTHE CELLAR-HOUSE\nStart of next."
+        result = clean_passage(text)
+        assert "THE CELLAR-HOUSE" not in result
+        assert "End of paragraph." in result
+        assert "Start of next." in result
+
+    def test_removes_numeric_repetition_run(self):
+        # "126. 127. 128. 129." — OCR page reference run
+        text = "Good prose. 126. 127. 128. 129. More prose."
+        result = clean_passage(text)
+        assert "127" not in result
+        assert "Good prose." in result
+        assert "More prose." in result
+
+    def test_preserves_inline_date(self):
+        # "published in 1891" must not be stripped
+        text = "This work was published in 1891 by the author."
+        assert "1891" in clean_passage(text)
+
+    def test_preserves_prose_with_numbers(self):
+        text = "There were 3 soldiers and 12 horses in the regiment."
+        result = clean_passage(text)
+        assert "3 soldiers" in result
+        assert "12 horses" in result
+
+    def test_strips_leading_trailing_whitespace(self):
+        text = "   Some prose.   "
+        assert not clean_passage(text).startswith(" ")
+        assert not clean_passage(text).endswith(" ")
+
+    def test_collapses_excess_blank_lines(self):
+        text = "Para one.\n\n\n\n\nPara two."
+        result = clean_passage(text)
+        assert "\n\n\n" not in result
+
+    def test_empty_string(self):
+        assert clean_passage("") == ""
+
+    def test_clean_passage_unchanged_when_no_artifacts(self):
+        text = "The village lay along the road, built of stone."
+        assert clean_passage(text) == text
+
+    def test_chapter_header_removed(self):
+        text = "Last sentence of chapter.\nCHAPTER III\nFirst sentence of next."
+        result = clean_passage(text)
+        assert "CHAPTER III" not in result
+
+    def test_collect_examples_uses_cleaned_passages(self):
+        # The artifact should be gone from examples produced by collect_examples
+        q = make_q(passage="Good prose.\n123\nMore prose that makes it long enough.")
+        result = collect_examples([q], min_passage=10)
+        assert len(result) == 1
+        assert "123" not in result[0]["passage"]
 
 
 # ---------------------------------------------------------------------------

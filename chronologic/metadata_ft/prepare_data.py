@@ -57,6 +57,7 @@ Usage
 import argparse
 import json
 import random
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -141,6 +142,57 @@ def build_instruction(q: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# OCR artifact cleaning
+# ---------------------------------------------------------------------------
+
+def clean_passage(text: str) -> str:
+    """
+    Remove OCR artifacts from digitised historical book passages.
+
+    The raw passages in chronologic_en_0.1.jsonl come from HathiTrust OCR
+    and contain several common artifacts that corrupt fine-tuning:
+
+    1. Standalone page numbers — lines that are only a number, e.g. "\n123\n"
+    2. Running headers — ALL-CAPS lines like "THE CELLAR-HOUSE" or "CHAPTER III"
+       that repeat the book/chapter title mid-passage
+    3. Numeric repetition runs — "126. 127. 128. 129..." (OCR'd page/footnote refs)
+    4. Excess whitespace left behind after removal
+
+    Prose content and inline numbers (dates, statistics) are preserved.
+    """
+    # 1. Remove standalone page numbers on their own line, e.g. "\n123\n"
+    text = re.sub(r'\n[ \t]*\d{1,4}[ \t]*\n', '\n', text)
+
+    # 2. Remove ALL-CAPS header + page-number on their own line,
+    #    e.g. "\nTHE CELLAR-HOUSE 123\n"
+    text = re.sub(r'\n[ \t]*[A-Z][A-Z\s\-:\'\.]{3,40}[ \t]+\d{1,4}[ \t]*\n', '\n', text)
+
+    # 3. Remove lines that are purely an ALL-CAPS running header,
+    #    e.g. "\nTHE CELLAR-HOUSE\n" or "\nCHAPTER III\n"
+    text = re.sub(r'\n[ \t]*[A-Z][A-Z\s\-:\'\.]{3,60}[ \t]*\n', '\n', text)
+
+    # 4. Remove inline "HEADER. PAGE_NUM " prefix merged into a prose line,
+    #    e.g. "\nLONDON. 253 fingers..." or "\nROSINE. 67 this or that..."
+    #    Pattern: newline, ALL-CAPS word(s), period, 1-4 digit page number, space.
+    text = re.sub(r'\n[A-Z][A-Z\s_]{2,30}\.\s*\d{1,4}\s+', '\n', text)
+
+    # 5. Remove "HEADER. " prefix without a page number (e.g. "\nROSINE. text")
+    #    only when HEADER is a single capitalised token (book/character name used
+    #    as a running header), not a sentence start.
+    text = re.sub(r'\n[A-Z]{3,20}\.\s+(?=[a-z"\'«])', '\n', text)
+
+    # 6. Remove numeric repetition runs: three or more numbers in sequence,
+    #    e.g. "126. 127. 128. 129." — OCR'd page/footnote reference lists
+    text = re.sub(r'(\b\d{1,4}[\.\,\s]+){3,}', ' ', text)
+
+    # 7. Collapse multiple blank lines and strip leading/trailing whitespace
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = text.strip()
+
+    return text
+
+
+# ---------------------------------------------------------------------------
 # Example format
 # ---------------------------------------------------------------------------
 
@@ -177,7 +229,7 @@ def collect_examples(questions: list, min_passage: int = 100) -> list:
     seen: dict = defaultdict(set)  # htid → set of seen passage strings
 
     for q in questions:
-        passage = (q.get("passage") or "").strip()
+        passage = clean_passage((q.get("passage") or "").strip())
         if len(passage) < min_passage:
             continue
 
