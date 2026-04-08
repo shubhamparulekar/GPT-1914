@@ -14,7 +14,14 @@
       "Bash(nohup /home/sdp7/run_condC.sh)",
       "Bash(echo \"Cond C waiter PID: $!\")",
       "Bash(git add:*)",
-      "Bash(git commit -m ':*)"
+      "Bash(git commit -m ':*)",
+      "Bash(ls -lh /home/sdp7/GPT-1914/chronologic/booksample/free_gen_qwen7b_metaft_cond*.json)",
+      "Bash(ls /home/sdp7/GPT-1914/chronologic/booksample/free_gen_*.json)",
+      "Bash(ls /home/sdp7/GPT-1914/chronologic/booksample/*.json)",
+      "Bash(cp /home/sdp7/GPT-1914/chronologic/booksample/free_gen_qwen7b_metaft_condA.json /home/sdp7/GPT-1914/chronologic/metadata_ft/)",
+      "Bash(cp /home/sdp7/GPT-1914/chronologic/booksample/free_gen_qwen7b_metaft_condC.json /home/sdp7/GPT-1914/chronologic/metadata_ft/)",
+      "Bash(ssh -T git@github.com)",
+      "Bash(git config:*)"
     ]
   }
 }
