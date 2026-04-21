@@ -36,6 +36,7 @@ Examples:
 """
 
 import argparse
+import contextlib
 import random
 import sys
 from datetime import datetime
@@ -220,27 +221,16 @@ def train_one_epoch(model, loader, optimizer, scheduler, device,
         if token_type_ids is not None:
             kwargs["token_type_ids"] = token_type_ids
 
-        if use_amp:
-            with torch.amp.autocast("cuda"):
-                logits = model(**kwargs).logits.squeeze(-1)
-                loss = loss_fn(logits, labels) / grad_accum_steps
-            scaler.scale(loss).backward()
-        else:
+        with (torch.amp.autocast("cuda", dtype=torch.bfloat16) if use_amp else contextlib.nullcontext()):
             logits = model(**kwargs).logits.squeeze(-1)
             loss = loss_fn(logits, labels) / grad_accum_steps
-            loss.backward()
+        loss.backward()
 
         total_loss += loss.item() * grad_accum_steps
 
         if (i + 1) % grad_accum_steps == 0:
-            if use_amp:
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-                optimizer.step()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
             step += 1
@@ -248,21 +238,15 @@ def train_one_epoch(model, loader, optimizer, scheduler, device,
     # Handle leftover micro-batches at end of epoch
     remaining = len(loader) % grad_accum_steps
     if remaining != 0:
-        if use_amp:
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            optimizer.step()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        optimizer.step()
         scheduler.step()
         optimizer.zero_grad()
 
     return total_loss / len(loader)
 
 
-def evaluate(model, loader, device, loss_fn):
+def evaluate(model, loader, device, loss_fn, use_amp=False):
     model.eval()
     all_logits, all_labels = [], []
     total_loss = 0.0
@@ -280,8 +264,9 @@ def evaluate(model, loader, device, loss_fn):
             if token_type_ids is not None:
                 kwargs["token_type_ids"] = token_type_ids
 
-            logits = model(**kwargs).logits.squeeze(-1)
-            loss = loss_fn(logits, labels)
+            with (torch.amp.autocast("cuda", dtype=torch.bfloat16) if use_amp else contextlib.nullcontext()):
+                logits = model(**kwargs).logits.squeeze(-1)
+                loss = loss_fn(logits, labels)
             total_loss += loss.item()
 
             # Move to CPU before numpy (required for MPS)
@@ -367,8 +352,9 @@ def main(argv=None):
 
     # Device
     device = select_device(args.device)
-    use_amp = device.type == "cuda"
-    scaler = torch.amp.GradScaler("cuda") if use_amp else None
+    # DeBERTa-v3 loads in fp16 by default causing NaN; run in fp32, no AMP
+    use_amp = False
+    scaler = None
 
     # Gradient accumulation
     grad_accum_steps = args.effective_batch_size // args.batch_size
@@ -401,7 +387,9 @@ def main(argv=None):
 
     # Model
     print(f"\nLoading model: {MODEL_NAME}")
-    model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=1)
+    model = AutoModelForSequenceClassification.from_pretrained(
+        MODEL_NAME, num_labels=1, torch_dtype=torch.float32
+    )
     model = model.to(device)
 
     # Optimizer (exclude bias + LayerNorm from weight decay)
@@ -437,7 +425,7 @@ def main(argv=None):
             model, train_loader, optimizer, scheduler, device,
             grad_accum_steps, use_amp, scaler, loss_fn,
         )
-        val_m = evaluate(model, val_loader, device, loss_fn)
+        val_m = evaluate(model, val_loader, device, loss_fn, use_amp=use_amp)
 
         train_losses.append(train_loss)
         val_metrics_list.append(val_m)

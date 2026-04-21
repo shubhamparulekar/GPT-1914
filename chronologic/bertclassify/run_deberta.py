@@ -284,7 +284,7 @@ def main(argv=None):
     # Load model + tokenizer
     print(f"\nLoading model from {model_dir} ...")
     tokenizer = AutoTokenizer.from_pretrained(str(model_dir))
-    model = AutoModelForSequenceClassification.from_pretrained(str(model_dir))
+    model = AutoModelForSequenceClassification.from_pretrained(str(model_dir), torch_dtype=torch.float32)
     model = model.to(device)
     print(f"Model loaded ({sum(p.numel() for p in model.parameters()):,} parameters)")
 
