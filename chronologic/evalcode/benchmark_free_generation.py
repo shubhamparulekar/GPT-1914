@@ -478,6 +478,7 @@ def run_free_generation(
     credentials_path=None,
     reasoning_effort="none",
     quantize=None,
+    device_map=None,
     lora_adapter=None,
     trust_remote_code=False,
     num_questions=None,
@@ -540,6 +541,7 @@ def run_free_generation(
             model_id,
             trust_remote_code=trust_remote_code,
             quantize=quantize,
+            device_map=device_map,
             lora_adapter=lora_adapter,
         )
         client = None
@@ -627,6 +629,10 @@ def main():
         help="HF model quantization via torchao.",
     )
     parser.add_argument(
+        '--device-map', metavar='DEVICE_MAP', dest='device_map',
+        help="HF Accelerate device_map (e.g. 'auto'). Mutually exclusive with --quantize.",
+    )
+    parser.add_argument(
         '--lora-adapter', metavar='PATH',
         help="Path to LoRA adapter checkpoint (HF only).",
     )
@@ -659,6 +665,7 @@ def main():
         credentials_path=args.credentials,
         reasoning_effort=args.reasoning_effort,
         quantize=args.quantize,
+        device_map=args.device_map,
         lora_adapter=args.lora_adapter,
         trust_remote_code=args.trust_remote_code,
         num_questions=args.num_questions,
