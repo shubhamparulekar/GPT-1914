@@ -502,8 +502,8 @@ def main(argv=None):
     write_manual_jsonl(manual_items, manual_jsonl_path)
 
     print(f"Total questions:    {total_questions}")
-    print(f"Sent to DeBERTa:    {n_deberta}  → {deberta_tsv_path}")
-    print(f"Sent to manual:     {n_manual}  → {manual_jsonl_path}")
+    print(f"Sent to DeBERTa:    {n_deberta}  -> {deberta_tsv_path}")
+    print(f"Sent to manual:     {n_manual}  -> {manual_jsonl_path}")
 
     reason_counts: dict = {}
     for item in manual_items:
@@ -611,7 +611,7 @@ def main(argv=None):
     with open(score_path, "w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)
 
-    print(f"Score written → {score_path}")
+    print(f"Score written -> {score_path}")
 
 
 if __name__ == "__main__":

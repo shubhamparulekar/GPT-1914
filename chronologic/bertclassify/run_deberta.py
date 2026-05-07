@@ -211,7 +211,7 @@ def write_output(output_path: Path, texts: list[str], probs: np.ndarray, thresho
             pred = 1 if prob > threshold else 0
             clean = text.replace("\t", " ").replace("\n", " ")
             f.write(f"{clean}\t{pred}\t{prob:.6f}\n")
-    print(f"Predictions written → {output_path}")
+    print(f"Predictions written -> {output_path}")
 
 
 # ---------------------------------------------------------------------------
